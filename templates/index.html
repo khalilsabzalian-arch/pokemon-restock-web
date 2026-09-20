@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pokemon Restock Tracker</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #1a1a2e;
+    --muted: #6b7280;
+    --accent: #dc2626;
+    --accent-dark: #991b1b;
+    --green: #16a34a;
+    --border: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  header {
+    background: var(--accent);
+    color: white;
+    padding: 16px 20px calc(16px + env(safe-area-inset-top, 0px));
+    padding-top: calc(16px + env(safe-area-inset-top, 0px));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  header .icon { font-size: 22px; }
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 10px;
+    background: var(--card);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .card h3 { margin: 0 0 4px; font-size: 16px; }
+  .meta { font-size: 13px; color: var(--muted); margin: 2px 0; }
+  .badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .badge.in-stock { background: #dcfce7; color: var(--green); }
+  .badge.out-of-stock { background: #f3f4f6; color: var(--muted); }
+  .badge.error { background: #fee2e2; color: var(--accent-dark); }
+  .card a.link { color: var(--accent); font-size: 13px; text-decoration: none; }
+  .remove-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+  .empty { text-align: center; color: var(--muted); padding: 40px 20px; }
+
+  .fab {
+    position: fixed;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    font-size: 28px;
+    border: none;
+    box-shadow: 0 4px 12px rgba(220,38,38,0.4);
+    cursor: pointer;
+    z-index: 20;
+  }
+
+  form label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 4px; }
+  form input, form select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 15px;
+  }
+  .btn {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    margin-top: 16px;
+    cursor: pointer;
+  }
+  .btn.secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 30;
+    align-items: flex-end;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--card);
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    border-radius: 16px 16px 0 0;
+    padding: 20px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .modal h2 { margin-top: 0; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .toast {
+    position: fixed;
+    top: calc(70px + env(safe-area-inset-top, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    background: #111827;
+    color: white;
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    z-index: 40;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎴 Restock Tracker</h1>
+  <span class="icon" id="refreshBtn" role="button">⟳</span>
+</header>
+
+<main>
+  <div class="tabs">
+    <div class="tab active" data-view="watchlist">Watchlist</div>
+    <div class="tab" data-view="settings">Settings</div>
+  </div>
+
+  <div class="view active" id="view-watchlist">
+    <div id="productList"></div>
+  </div>
+
+  <div class="view" id="view-settings">
+    <div class="card">
+      <h3>Alerts</h3>
+      <label>Best Buy API key</label>
+      <input type="text" id="bestbuyKey" placeholder="from developer.bestbuy.com">
+      <label>Twilio Account SID</label>
+      <input type="text" id="twilioSid" placeholder="ACxxxxxxxx">
+      <label>Twilio Auth Token</label>
+      <input type="password" id="twilioToken" placeholder="••••••••">
+      <label>Twilio From Number</label>
+      <input type="text" id="twilioFrom" placeholder="+1XXXXXXXXXX">
+      <label>Your Phone Number</label>
+      <input type="text" id="twilioTo" placeholder="+1XXXXXXXXXX">
+      <label>Check every (seconds)</label>
+      <input type="number" id="checkInterval" value="120" min="30">
+      <p class="hint">Stored locally on this server only, in data/settings.json. Never share that file.</p>
+      <button class="btn" id="saveSettingsBtn">Save Settings</button>
+    </div>
+  </div>
+</main>
+
+<button class="fab" id="addBtn">+</button>
+
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <h2>Track a Product</h2>
+    <form id="addForm">
+      <label>Nickname</label>
+      <input type="text" id="f_name" placeholder="e.g. Scarlet & Violet Booster Box" required>
+
+      <label>Retailer</label>
+      <select id="f_retailer" required>
+        <option value="bestbuy">Best Buy</option>
+        <option value="target">Target</option>
+        <option value="walmart">Walmart</option>
+        <option value="walgreens">Walgreens</option>
+      </select>
+
+      <label>Zip Code</label>
+      <input type="text" id="f_zip" placeholder="97201" required>
+
+      <div id="fieldsBestbuy" class="retailer-fields">
+        <label>Best Buy SKU</label>
+        <input type="text" id="f_sku" placeholder="e.g. 6418599">
+      </div>
+      <div id="fieldsTarget" class="retailer-fields" style="display:none">
+        <label>Target TCIN</label>
+        <input type="text" id="f_tcin" placeholder="e.g. 88611234">
+        <label>Target Store ID</label>
+        <input type="text" id="f_target_store" placeholder="e.g. 1234">
+      </div>
+      <div id="fieldsWalmart" class="retailer-fields" style="display:none">
+        <label>Walmart Item ID</label>
+        <input type="text" id="f_item_id" placeholder="e.g. 987654321">
+      </div>
+      <div id="fieldsWalgreens" class="retailer-fields" style="display:none">
+        <label>Walgreens Product ID</label>
+        <input type="text" id="f_product_id" placeholder="from the product URL">
+        <label>Walgreens Store ID</label>
+        <input type="text" id="f_walgreens_store" placeholder="from the store locator">
+      </div>
+
+      <button type="submit" class="btn">Add to Watchlist</button>
+      <button type="button" class="btn secondary" id="cancelAddBtn">Cancel</button>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const productList = document.getElementById('productList');
+const toastEl = document.getElementById('toast');
+
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(() => toastEl.classList.remove('show'), 2200);
+}
+
+function timeAgo(iso) {
+  if (!iso) return 'never';
+  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs/60)}m ago`;
+  return `${Math.floor(secs/3600)}h ago`;
+}
+
+async function loadProducts() {
+  const res = await fetch('/api/products');
+  const products = await res.json();
+  if (products.length === 0) {
+    productList.innerHTML = '<div class="empty">No products yet.<br>Tap + to add one.</div>';
+    return;
+  }
+  productList.innerHTML = products.map(p => {
+    const status = p.status || {};
+    let badge = '<span class="badge out-of-stock">Out of stock</span>';
+    if (status.error) badge = '<span class="badge error">Check failed</span>';
+    else if (status.in_stock) badge = '<span class="badge in-stock">IN STOCK</span>';
+    const storeUrl = (status.stores && status.stores[0] && status.stores[0].url) || '#';
+    return `
+      <div class="card">
+        <div class="card-top">
+          <div>
+            <h3>${p.name}</h3>
+            <div class="meta">${p.retailer.charAt(0).toUpperCase() + p.retailer.slice(1)} · zip ${p.zip}</div>
+            <div class="meta">Checked ${timeAgo(status.last_checked)}</div>
+          </div>
+          <button class="remove-btn" onclick="removeProduct('${p.id}')">✕</button>
+        </div>
+        <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+          ${badge}
+          <a class="link" href="${storeUrl}" target="_blank">View product →</a>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function removeProduct(id) {
+  await fetch(`/api/products/${id}`, { method: 'DELETE' });
+  toast('Removed');
+  loadProducts();
+}
+
+document.getElementById('refreshBtn').addEventListener('click', async () => {
+  toast('Checking now…');
+  await fetch('/api/check-now', { method: 'POST' });
+  setTimeout(loadProducts, 3000);
+});
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('view-' + tab.dataset.view).classList.add('active');
+  });
+});
+
+// Add modal
+const addModal = document.getElementById('addModal');
+document.getElementById('addBtn').addEventListener('click', () => addModal.classList.add('active'));
+document.getElementById('cancelAddBtn').addEventListener('click', () => addModal.classList.remove('active'));
+
+document.getElementById('f_retailer').addEventListener('change', (e) => {
+  document.querySelectorAll('.retailer-fields').forEach(el => el.style.display = 'none');
+  const map = { bestbuy: 'fieldsBestbuy', target: 'fieldsTarget', walmart: 'fieldsWalmart', walgreens: 'fieldsWalgreens' };
+  document.getElementById(map[e.target.value]).style.display = 'block';
+});
+
+document.getElementById('addForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const retailer = document.getElementById('f_retailer').value;
+  const body = {
+    name: document.getElementById('f_name').value,
+    retailer,
+    zip: document.getElementById('f_zip').value,
+  };
+  if (retailer === 'bestbuy') body.sku = document.getElementById('f_sku').value;
+  if (retailer === 'target') { body.tcin = document.getElementById('f_tcin').value; body.store_id = document.getElementById('f_target_store').value; }
+  if (retailer === 'walmart') body.item_id = document.getElementById('f_item_id').value;
+  if (retailer === 'walgreens') { body.product_id = document.getElementById('f_product_id').value; body.store_id = document.getElementById('f_walgreens_store').value; }
+
+  const res = await fetch('/api/products', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (res.ok) {
+    addModal.classList.remove('active');
+    e.target.reset();
+    toast('Added — checking now…');
+    setTimeout(loadProducts, 2500);
+    loadProducts();
+  } else {
+    const err = await res.json();
+    toast(err.error || 'Could not add product');
+  }
+});
+
+// Settings
+async function loadSettings() {
+  const res = await fetch('/api/settings');
+  const s = await res.json();
+  document.getElementById('twilioTo').value = s.twilio_to_number || '';
+  document.getElementById('checkInterval').value = s.check_interval_seconds || 120;
+  document.getElementById('bestbuyKey').placeholder = s.bestbuy_api_key_set ? 'Saved (leave blank to keep)' : 'from developer.bestbuy.com';
+  document.getElementById('twilioSid').placeholder = s.twilio_configured ? 'Saved (leave blank to keep)' : 'ACxxxxxxxx';
+  document.getElementById('twilioToken').placeholder = s.twilio_configured ? 'Saved (leave blank to keep)' : '••••••••';
+}
+
+document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
+  const body = {
+    bestbuy_api_key: document.getElementById('bestbuyKey').value,
+    twilio_account_sid: document.getElementById('twilioSid').value,
+    twilio_auth_token: document.getElementById('twilioToken').value,
+    twilio_from_number: document.getElementById('twilioFrom').value,
+    twilio_to_number: document.getElementById('twilioTo').value,
+    check_interval_seconds: parseInt(document.getElementById('checkInterval').value, 10),
+  };
+  await fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  toast('Settings saved');
+  loadSettings();
+});
+
+loadProducts();
+loadSettings();
+setInterval(loadProducts, 20000); // auto-refresh view every 20s
+</script>
+</body>
+</html>
